@@ -7,6 +7,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import Sidebar from "@/components/Sidebar";
+import KOrb from '@/components/KOrb';
+import SettingsModal from "@/components/SettingsModal";
 
 interface Message {
   role: "user" | "assistant";
@@ -58,7 +60,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const { isListening, transcript, startListening, stopListening, resetTranscript, hasRecognition } = useVoiceInput();
+  const { isListening, transcript, startListening, stopListening, resetTranscript, hasRecognition, isWakeWordEnabled, toggleWakeWord, isWakeWordListening } = useVoiceInput();
 
   // Initialize session on load
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function Home() {
   // Update input text with voice transcript
   useEffect(() => {
     if (transcript) {
+      console.log("Updating Input with:", transcript);
       setInputText(transcript);
     }
   }, [transcript]);
@@ -409,7 +412,7 @@ export default function Home() {
             </button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-blue-400 drop-shadow-[0_0_10px_rgba(139,92,246,0.3)]">
-                JARVIS
+                K
               </h1>
               <p className="hidden md:block text-xs text-violet-400/60 font-mono tracking-widest mt-1">
                 ADVANCED VIRTUAL ASSISTANT
@@ -417,14 +420,28 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse" />
-            <span className="font-mono text-[10px] md:text-xs text-violet-200 tracking-wider">
-              STATUS: <span className="text-green-400 font-bold">ONLINE</span>
-            </span>
+          <div className="flex items-center gap-3">
+            {/* Wake Word Status */}
+            <button
+              onClick={toggleWakeWord}
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isWakeWordEnabled
+                ? "bg-violet-500/20 border-violet-500/30 text-violet-200"
+                : "bg-white/5 border-white/10 text-neutral-400 hover:text-neutral-300"
+                }`}
+              title={isWakeWordEnabled ? "Wake Word Active (Say 'Hey K')" : "Enable Wake Word"}
+            >
+              <div className={`w-2 h-2 rounded-full ${isWakeWordEnabled ? (isWakeWordListening ? "bg-violet-400 animate-pulse" : "bg-violet-400") : "bg-neutral-600"}`} />
+              <span className="text-xs font-mono">{isWakeWordEnabled ? (isWakeWordListening ? "LISTENING..." : "ON STANDBY") : "VOICE OFF"}</span>
+            </button>
+
+            <div className="flex items-center gap-3 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse" />
+              <span className="font-mono text-[10px] md:text-xs text-violet-200 tracking-wider">
+                STATUS: <span className="text-green-400 font-bold">ONLINE</span>
+              </span>
+            </div>
           </div>
         </div>
-
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-violet-600/20 scrollbar-track-transparent">
           <div className="max-w-4xl mx-auto flex flex-col gap-4 pb-4">

@@ -113,7 +113,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             }
             if (!data.personas) {
                 data.personas = [
-                    { id: 'default', name: 'Jarvis', description: 'Your helpful AI assistant.', system_prompt: 'You are a helpful AI assistant.' }
+                    { id: 'default', name: 'K', description: 'Your helpful AI assistant.', system_prompt: 'You are a helpful AI assistant.' }
                 ];
                 data.active_persona_id = 'default';
             }

@@ -3,12 +3,13 @@
 import React from "react";
 import { motion, Variants } from "framer-motion";
 
-interface JarvisOrbProps {
+interface KOrbProps {
     isSpeaking: boolean;
     isListening: boolean;
 }
 
-const JarvisOrb: React.FC<JarvisOrbProps> = ({ isSpeaking, isListening }) => {
+const KOrb: React.FC<KOrbProps> = ({ isSpeaking, isListening }) => {
+    // ... same variants ...
     const coreVariants: Variants = {
         speaking: {
             scale: [1, 1.5, 1],
@@ -31,7 +32,7 @@ const JarvisOrb: React.FC<JarvisOrbProps> = ({ isSpeaking, isListening }) => {
 
     return (
         <div className="relative flex items-center justify-center w-96 h-96">
-            {/* Core Glow */}
+            {/* Core Glow - Adjusted to be more neutral/white for 'K' or keep violet? Keeping violet for now unless requested otherwise */}
             <motion.div
                 className="absolute w-40 h-40 bg-violet-600 rounded-full blur-2xl"
                 variants={coreVariants}
@@ -76,4 +77,4 @@ const JarvisOrb: React.FC<JarvisOrbProps> = ({ isSpeaking, isListening }) => {
     );
 };
 
-export default JarvisOrb;
+export default KOrb;

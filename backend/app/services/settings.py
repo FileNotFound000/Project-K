@@ -24,7 +24,7 @@ DEFAULT_SETTINGS = {
     "personas": [
         {
             "id": "default",
-            "name": "Jarvis",
+            "name": "K",
             "description": "Your helpful AI assistant.",
             "system_prompt": "You are a helpful AI assistant. You can answer questions and also control the user's computer system."
         },
