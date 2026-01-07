@@ -115,11 +115,11 @@
 -   **System Commands**: Try saying "Open Notepad", "Set volume to 50%", or "Mute audio".
 -   **Memory**: Drag and drop text files into the chat to add them to the knowledge base.
 
-## 🗺️ Roadmap & Status
+##  Roadmap & Status
 Check [PROJECT_STATUS.md](./PROJECT_STATUS.md) for the latest tracking of features, bugs, and future plans.
 
-## 🤝 Contributing
+##  Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+##  License
 [MIT](LICENSE)
