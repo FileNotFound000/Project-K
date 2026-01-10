@@ -25,6 +25,8 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     // Refs to avoid stale closures in event handlers
     const isListeningRef = useRef(false);
     const isWakeWordEnabledRef = useRef(false);
+    // New ref to track transition state
+    const isSwitchingToMainRef = useRef(false);
 
     // Sync refs
     useEffect(() => {
@@ -46,6 +48,8 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
 
             recognitionInstance.onstart = () => {
                 setIsListening(true);
+                // When main starts, we are definitely done switching
+                isSwitchingToMainRef.current = false;
             };
 
             recognitionInstance.onend = () => {
@@ -90,7 +94,14 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
 
             wakeInstance.onend = () => {
                 setIsWakeWordListening(false);
-                // Auto-restart logic
+
+                // If we are deliberately switching to main, DO NOT restart wake word
+                if (isSwitchingToMainRef.current) {
+                    console.log("Wake word stopped for transition. Skipping auto-restart.");
+                    return;
+                }
+
+                // Auto-restart logic for accidental stops
                 if (isWakeWordEnabledRef.current && !isListeningRef.current) {
                     console.log("Wake word listener stopped. Restarting...");
                     try {
@@ -105,12 +116,15 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
                 const results = event.results;
                 const lastResult = results[results.length - 1];
                 const text = lastResult[0].transcript.toLowerCase().trim();
-
                 // Wake Word Detection Logic
-                // We use regex to ensure we match whole words or specific phrases, reducing false positives from "ether", "whether", etc.
-                const wakeWordRegex = /(^|\s)(hey k|k|kay|computer)(\s|$|[.,!?])/i;
+                // Expanded regex to handle misinterpretations (e.g. "hai ke" -> "hey k", "ke" -> "k")
+                const wakeWordRegex = /(^|\s)(hey\s?k|hai\s?k|hay\s?k|hey\s?ke|hai\s?ke|k|kay|ke|key|cay|que|computer)(\s|$|[.,!?])/i;
                 if (wakeWordRegex.test(text)) {
                     console.log(`Wake Word Detected on: "${text}"`);
+
+                    // Set flag BEFORE aborting
+                    isSwitchingToMainRef.current = true;
+
                     wakeInstance.abort(); // Force stop immediately
                     setIsWakeWordListening(false);
 
@@ -140,8 +154,9 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     const startListeningRef = useRef<() => void>(() => { });
 
     const startListening = useCallback(() => {
-        // Stop wake word first
+        // Stop wake word first and mark as switching (just in case called manually)
         if (wakeWordRecognition) {
+            isSwitchingToMainRef.current = true;
             try { wakeWordRecognition.abort(); } catch (e) { }
         }
 
