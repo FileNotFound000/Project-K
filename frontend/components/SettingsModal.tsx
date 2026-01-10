@@ -43,7 +43,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         voice: 'default',
         active_provider: 'gemini',
         providers: {
-            gemini: { api_key: '', model: 'gemini-2.5-flash-lite' },
+            gemini: { api_key: '', model: 'gemini-2.5-flash' },
             openai: { api_key: '', model: 'gpt-4o' },
             ollama: { base_url: 'http://localhost:11434', model: 'llama3' }
         },
@@ -105,7 +105,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             const data = response.data;
             if (!data.providers) {
                 data.providers = {
-                    gemini: { api_key: data.api_key || '', model: 'gemini-2.5-flash-lite' },
+                    gemini: { api_key: data.api_key || '', model: 'gemini-1.5-flash-latest' },
                     openai: { api_key: '', model: 'gpt-4o' },
                     ollama: { base_url: 'http://localhost:11434', model: 'llama3' }
                 };

@@ -76,13 +76,97 @@ class SystemControlService:
                 print(f"Error opening app: {e2}")
                 return f"Error opening app: {str(e2)}"
 
-    def take_screenshot(self):
-        """
-        Take a screenshot and return it.
-        """
-        try:
-            screenshot = pyautogui.screenshot()
-            return screenshot
         except Exception as e:
             print(f"Error taking screenshot: {e}")
             return None
+
+    def media_control(self, action: str):
+        """
+        Control media playback.
+        actions: "play_pause", "next", "prev", "stop"
+        """
+        key_map = {
+            "play_pause": "playpause",
+            "next": "nexttrack",
+            "prev": "prevtrack",
+            "stop": "stop"
+        }
+        key = key_map.get(action)
+        if key:
+            pyautogui.press(key)
+            return f"Media action executed: {action}"
+        return f"Unknown media action: {action}"
+
+    def set_brightness(self, level: int):
+        """
+        Set screen brightness (0-100).
+        """
+        try:
+            import screen_brightness_control as sbc
+            sbc.set_brightness(level)
+            return f"Brightness set to {level}%"
+        except ImportError:
+            return "Error: screen-brightness-control module not installed."
+        except Exception as e:
+            return f"Error setting brightness: {e}"
+
+    def system_power(self, action: str):
+        """
+        Power actions: "shutdown", "restart", "sleep", "lock"
+        """
+        if self.system == "Windows":
+            if action == "shutdown":
+                os.system("shutdown /s /t 10") # 10s delay to cancel
+                return "Shutting down in 10 seconds. Run 'shutdown /a' to abort."
+            elif action == "restart":
+                os.system("shutdown /r /t 10")
+                return "Restarting in 10 seconds."
+            elif action == "sleep":
+                os.system("rundll32.dll powrprof.dll,SetSuspendState 0,1,0")
+                return "Going to sleep..."
+            elif action == "lock":
+                os.system("rundll32.dll user32.dll,LockWorkStation")
+                return "Locking workstation."
+        return f"Power action {action} not supported or failed."
+
+    def window_control(self, action: str):
+        """
+        Window actions: "minimize", "maximize", "restore"
+        """
+        if action == "minimize":
+            pyautogui.hotkey('win', 'down')
+            pyautogui.hotkey('win', 'down') # Twice often needed to fully minimize
+            return "Window minimized"
+        elif action == "maximize":
+            pyautogui.hotkey('win', 'up')
+            return "Window maximized"
+        return f"Unknown window action: {action}"
+
+    def interact(self, action: str, **kwargs):
+        """
+        Generic interaction: "type", "press", "hotkey"
+        """
+        try:
+            if action == "type":
+                text = kwargs.get("text", "")
+                interval = kwargs.get("interval", 0.05)
+                pyautogui.write(text, interval=interval)
+                return f"Typed: {text}"
+            elif action == "press":
+                key = kwargs.get("key")
+                pyautogui.press(key)
+                return f"Pressed: {key}"
+            elif action == "hotkey":
+                keys = kwargs.get("keys", []) # List of keys e.g. ['ctrl', 'c']
+                pyautogui.hotkey(*keys)
+                return f"Hotkey pressed: {keys}"
+            elif action == "click":
+                x = kwargs.get("x")
+                y = kwargs.get("y")
+                if x is not None and y is not None:
+                    pyautogui.click(x, y)
+                    return f"Clicked at ({x}, {y})"
+                return "Error: Coordinates x and y required for click."
+        except Exception as e:
+            return f"Interaction error: {e}"
+        return f"Unknown interaction: {action}"

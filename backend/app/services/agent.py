@@ -24,6 +24,15 @@ TOOLS:
   Format: {"tool": "system_control", "args": {"action": "mute"}}
   Format: {"tool": "system_control", "args": {"action": "unmute"}}
   Format: {"tool": "system_control", "args": {"action": "screenshot"}}
+  Format: {"tool": "system_control", "args": {"action": "media", "action_type": "play_pause"}}  (Options: play_pause, next, prev, stop)
+  Format: {"tool": "system_control", "args": {"action": "power", "action_type": "sleep"}}  (Options: shutdown, restart, sleep, lock)
+  Format: {"tool": "system_control", "args": {"action": "brightness", "level": 100}}
+  Format: {"tool": "system_control", "args": {"action": "window", "action_type": "minimize"}}
+  Format: {"tool": "system_control", "args": {"action": "interact", "action_type": "type", "text": "Hello"}}
+  Format: {"tool": "system_control", "args": {"action": "interact", "action_type": "type", "text": "Hello"}}
+  Format: {"tool": "system_control", "args": {"action": "interact", "action_type": "press", "key": "enter"}}
+- click_on_ui: Click a UI element by description.
+  Format: {"tool": "click_on_ui", "args": {"description": "the blue submit button"}}
 
 CRITICAL RULES:
 1. To use a tool, you MUST output the JSON command.
@@ -32,6 +41,9 @@ CRITICAL RULES:
 4. Example: "I'll save that." {"tool": "remember", "args": {"text": "User likes blue"}}
 5. Do NOT use the "remember" tool unless the user explicitly asks you to remember something or save a fact. Do NOT use it when answering questions based on existing memory.
 6. CRITICAL: Output the JSON command at the END of your response. Do NOT output anything after the JSON. Do NOT simulate the tool output.
+7. INTERACTION RULE: If the user asks you to "perform" something IN an app (e.g. "Calculate in Calculator", "Write in Notepad"), you must OPEN the app and then USE `interact` to type/press keys. Do NOT just calculate it yourself.
+   - Correct: Open Calculator -> interact(type="128*4") -> interact(press="enter")
+   - Incorrect: Open Calculator -> "The answer is 512."
 """
 
 class AgentService:
@@ -58,6 +70,16 @@ class AgentService:
             self.system_control = SystemControlService()
         except Exception as e:
             print(f"Failed to init system control service: {e}")
+            
+        except Exception as e:
+            print(f"Failed to init system control service: {e}")
+
+        try:
+            from app.services.vision_service import VisionService
+            self.vision_service = VisionService()
+        except Exception as e:
+            print(f"Failed to init vision service: {e}")
+            self.vision_service = None
             
         self._configure()
 
@@ -212,7 +234,7 @@ class AgentService:
             # images = [image_data] if image_data else None
             images = None # DEBUG: Disable images to test if they are causing the error
 
-            # ReAct Loop (Max 3 turns)
+            # ReAct Loop (Max 5 turns)
             accumulated_response = ""
             
             def log_debug(msg):
@@ -242,7 +264,7 @@ class AgentService:
                 session_history = history.copy()
                 executed_tools = set()
 
-                for turn in range(3):
+                for turn in range(5):
                     # Send to provider
                     log_debug(f"Turn {turn}: Sending message to provider...")
                     response_stream = self.provider.send_message_stream(session_history, current_msg_content, images)
@@ -259,20 +281,60 @@ class AgentService:
                         has_yielded_content = True
 
                     # End of stream. Check for tool.
-                    import re
+                    # End of stream. Check for tool.
                     import json
+                    command = None
                     
-                    json_match = re.search(r'\{.*"tool":.*\}', current_turn_text, re.DOTALL)
-                    
-                    if json_match:
-                        try:
-                            json_str = json_match.group(0)
-                            command = json.loads(json_str)
+                    # Robust JSON extraction
+                    try:
+                        # Find the first '{' that might start a tool JSON
+                        # We scan for "tool" to check validity
+                        start_indices = [i for i, char in enumerate(current_turn_text) if char == '{']
+                        
+                        for start in start_indices:
+                            # Simple optimization: check if "tool" is somewhat near
+                            # snippet = current_turn_text[start:start+100]
+                            # if '"tool"' not in snippet and "'tool'" not in snippet: continue
+
+                            # Stack-based brace counting
+                            balance = 0
+                            found_end = False
+                            for i in range(start, len(current_turn_text)):
+                                char = current_turn_text[i]
+                                if char == '{':
+                                    balance += 1
+                                elif char == '}':
+                                    balance -= 1
+                                    if balance == 0:
+                                        # Potential end of JSON
+                                        candidate = current_turn_text[start:i+1]
+                                        try:
+                                            parsed = json.loads(candidate)
+                                            if "tool" in parsed:
+                                                command = parsed
+                                                found_end = True
+                                                
+                                                # Correct the log logic to capture just this block
+                                                # Re-assign json_match logic for history appending later
+                                                class MockMatch:
+                                                    def end(self): return i+1
+                                                json_match = MockMatch()
+                                                break
+                                        except json.JSONDecodeError:
+                                            # Keep trying, maybe we found an inner brace set
+                                            pass
+                            if found_end:
+                                break
+                                
+                        if command:
                             log_debug(f"DEBUG: Extracted tool command: {command}")
-                        except Exception as e:
-                            log_debug(f"Failed to parse extracted JSON: {e}")
-                            command = None
-                    else:
+                        else:
+                            # Fallback to regex if brace counting fails (e.g. malformed)
+                            # but usually brace counting is superior.
+                            pass
+
+                    except Exception as e:
+                        log_debug(f"Failed to extract JSON: {e}")
                         command = None
 
                     if command and "tool" in command:
@@ -394,13 +456,69 @@ class AgentService:
                                         screenshot = self.system_control.take_screenshot()
                                         if screenshot:
                                             output_str = "Screenshot taken successfully."
-                                            # TODO: Handle screenshot image (save or send)
                                         else:
                                             output_str = "Failed to take screenshot."
+
+                                    elif action == "media":
+                                        sub_action = tool_args.get("action_type") # e.g. "play_pause"
+                                        yield {"text": f"\n\n*Media Control: {sub_action}*\n\n"}
+                                        accumulated_response += f"\n\n*Media Control: {sub_action}*\n\n"
+                                        output_str = self.system_control.media_control(sub_action)
+
+                                    elif action == "power":
+                                        sub_action = tool_args.get("action_type")
+                                        yield {"text": f"\n\n*System Power: {sub_action}*\n\n"}
+                                        accumulated_response += f"\n\n*System Power: {sub_action}*\n\n"
+                                        output_str = self.system_control.system_power(sub_action)
+
+                                    elif action == "brightness":
+                                        level = tool_args.get("level")
+                                        yield {"text": f"\n\n*Setting brightness to {level}%...*\n\n"}
+                                        accumulated_response += f"\n\n*Setting brightness to {level}%...*\n\n"
+                                        output_str = self.system_control.set_brightness(int(level))
+
+                                    elif action == "window":
+                                        sub_action = tool_args.get("action_type")
+                                        yield {"text": f"\n\n*Window Control: {sub_action}*\n\n"}
+                                        accumulated_response += f"\n\n*Window Control: {sub_action}*\n\n"
+                                        output_str = self.system_control.window_control(sub_action)
+
+                                    elif action == "interact":
+                                        sub_action = tool_args.get("action_type") # type, press, hotkey
+                                        yield {"text": f"\n\n*Simulating: {sub_action}*\n\n"}
+                                        accumulated_response += f"\n\n*Simulating: {sub_action}*\n\n"
+                                        
+                                        # Filter out keys that might conflict or aren't needed
+                                        interact_kwargs = {k: v for k, v in tool_args.items() if k not in ["action", "action_type"]}
+                                        output_str = self.system_control.interact(sub_action, **interact_kwargs)
+
                                     else:
                                         output_str = f"Error: Unknown system control action '{action}'"
                                 else:
                                     output_str = "Error: System Control Service not available."
+
+                            elif tool_name == "click_on_ui":
+                                description = tool_args.get("description")
+                                yield {"text": f"\n\n*Looking for '{description}'...*\n\n"}
+                                accumulated_response += f"\n\n*Looking for '{description}'...*\n\n"
+                                
+                                if self.vision_service:
+                                    coords = self.vision_service.get_click_coordinates(description)
+                                    if coords:
+                                        x, y = coords
+                                        yield {"text": f"\n\n*Clicking at ({x}, {y})...*\n\n"}
+                                        accumulated_response += f"\n\n*Clicking at ({x}, {y})...*\n\n"
+                                        
+                                        if self.system_control:
+                                            # Use the new click capability
+                                            self.system_control.interact("click", x=x, y=y)
+                                            output_str = f"Clicked description '{description}' at ({x}, {y})."
+                                        else:
+                                            output_str = "Error: Vision found coordinates, but System Control unavailable for clicking."
+                                    else:
+                                        output_str = f"Could not find UI element matching '{description}'."
+                                else:
+                                    output_str = "Error: Vision Service not available."
 
                             else:
                                 # Unknown tool, just finish

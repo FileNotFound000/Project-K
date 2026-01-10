@@ -22,7 +22,7 @@ class GeminiProvider(LLMProvider):
             if not system_instruction:
                 system_instruction = None
 
-            model_name = settings.get("model", "gemini-2.5-flash-lite")
+            model_name = settings.get("model", "gemini-2.5-flash")
             
             self.model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
         else:

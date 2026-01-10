@@ -86,6 +86,16 @@ class SettingsService:
         current = self.load_settings()
         current.update(settings)
         
+        # KEY FIX: Enforce stable model if user/frontend tries to set a restricted one
+        try:
+            gemini_config = current.get("providers", {}).get("gemini", {})
+            model = gemini_config.get("model", "")
+            # Removed strict sanitization to allow user to manually switch models
+            # if limits are reached (e.g., switching to gemini-2.0-flash or pro)
+            pass
+        except Exception as e:
+            print(f"Error sanitizing settings: {e}")
+
         with open(self.settings_file, "w") as f:
             json.dump(current, f, indent=4)
         return current
