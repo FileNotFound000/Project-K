@@ -29,6 +29,11 @@
   - Control your PC directly via chat or voice.
   - **Capabilities**: Set volume, mute/unmute, open applications, take screenshots, and more.
 
+- ** Autonomous Coding Agent** [NEW]
+  - **Read & Write**: Can read your project files and create new code files.
+  - **Patch & Fix**: Can surgically edit files to fix bugs or add features.
+  - **VS Code Integration**: Can launch VS Code and manipulate your workspace.
+
 - ** Futuristic UI**
   - Built with **Next.js 14**, **Tailwind CSS**, and **Framer Motion**.
   - Features a dynamic "Orb" visualizer that reacts to speaking and listening states.
