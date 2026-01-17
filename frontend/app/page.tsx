@@ -60,7 +60,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const { isListening, transcript, startListening, stopListening, resetTranscript, hasRecognition, isWakeWordEnabled, toggleWakeWord, isWakeWordListening } = useVoiceInput();
+  const { isListening, transcript, finalTranscript, resetFinalTranscript, startListening, stopListening, resetTranscript, hasRecognition, isWakeWordEnabled, toggleWakeWord, isWakeWordListening, isBackendConnected } = useVoiceInput();
 
   // Initialize session on load
   useEffect(() => {
@@ -88,6 +88,15 @@ export default function Home() {
       setInputText(transcript);
     }
   }, [transcript]);
+
+  // Auto-send when final transcript is received
+  useEffect(() => {
+    if (finalTranscript) {
+      console.log("Auto-sending final transcript:", finalTranscript);
+      sendMessage(finalTranscript);
+      resetFinalTranscript();
+    }
+  }, [finalTranscript]);
 
   const selectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
@@ -275,10 +284,13 @@ export default function Home() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() && !selectedImage) return;
+  const sendMessage = async (overrideText?: string) => {
+    // Use override text if provided (for voice auto-send), otherwise use state
+    const textToSend = typeof overrideText === "string" ? overrideText : inputText;
 
-    let finalMessage = inputText;
+    if (!textToSend.trim() && !selectedImage) return;
+
+    let finalMessage = textToSend;
     if (isResearchMode) {
       if (!finalMessage.toLowerCase().trim().startsWith("research")) {
         finalMessage = `Research ${finalMessage}`;
@@ -428,15 +440,24 @@ export default function Home() {
             <button
               onClick={toggleWakeWord}
               className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isWakeWordEnabled
-                ? "bg-violet-500/20 border-violet-500/30 text-violet-200"
+                ? (isBackendConnected
+                  ? "bg-violet-500/20 border-violet-500/30 text-violet-200"
+                  : "bg-orange-500/20 border-orange-500/30 text-orange-200")
                 : "bg-white/5 border-white/10 text-neutral-400 hover:text-neutral-300"
                 }`}
-              title={isWakeWordEnabled ? "Wake Word Active (Say 'Hey K')" : "Enable Wake Word"}
+              title={isWakeWordEnabled ? (isBackendConnected ? "Wake Word Active" : "Connecting to Backend...") : "Enable Wake Word"}
             >
-              <div className={`w-2 h-2 rounded-full ${isWakeWordEnabled ? (isListening ? "bg-red-500 animate-pulse" : "bg-violet-400") : "bg-neutral-600"}`} />
+              <div className={`w-2 h-2 rounded-full ${isWakeWordEnabled
+                ? (isBackendConnected
+                  ? (isListening ? "bg-red-500 animate-pulse" : "bg-violet-400")
+                  : "bg-orange-500 animate-pulse")
+                : "bg-neutral-600"}`}
+              />
               <span className="text-xs font-mono">
                 {isWakeWordEnabled
-                  ? (isListening ? "RECORDING..." : "WAITING FOR 'K'")
+                  ? (isBackendConnected
+                    ? (isListening ? "RECORDING..." : "WAITING FOR 'K'")
+                    : "CONNECTING...")
                   : "VOICE OFF"}
               </span>
             </button>
@@ -602,7 +623,7 @@ export default function Home() {
               />
 
               <button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={(!inputText.trim() && !selectedImage) || isProcessing}
                 className="p-3 md:p-3.5 rounded-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all shadow-lg shadow-violet-500/20"
               >

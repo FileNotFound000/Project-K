@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,6 +6,8 @@ from pydantic import BaseModel
 import uvicorn
 import os
 import json
+import asyncio
+from typing import List
 from dotenv import load_dotenv
 from app.services.agent import AgentService
 from app.services.search import search_web
@@ -14,6 +16,7 @@ from app.core.db import init_db, create_session, get_sessions, get_session_messa
 from app.services.system_control import SystemControlService
 from app.services.rag import ingest_document, retrieve_context
 from app.services.research import generate_research_report
+from app.services.voice_listener import VoiceListenerService
 import shutil
 
 load_dotenv()
@@ -40,6 +43,51 @@ init_db()
 if not os.path.exists("static/audio"):
     os.makedirs("static/audio")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Globals
+voice_listener = None
+main_event_loop = None
+active_websockets: List[WebSocket] = []
+
+async def broadcast_wake_word():
+    """Send wake word event to all connected clients"""
+    if not active_websockets:
+        return
+    
+    print("Broadcasting WAKE WORD to clients...")
+    to_remove = []
+    for ws in active_websockets:
+        try:
+            await ws.send_json({"type": "WAKE_WORD_DETECTED", "text": "karan"})
+        except Exception as e:
+            print(f"Failed to send to websocket: {e}")
+            to_remove.append(ws)
+    
+    for ws in to_remove:
+        if ws in active_websockets:
+            active_websockets.remove(ws)
+
+def on_wake_word_detected():
+    """Callback from VoiceListener (runs in thread)"""
+    if main_event_loop:
+        asyncio.run_coroutine_threadsafe(broadcast_wake_word(), main_event_loop)
+
+@app.on_event("startup")
+async def startup_event():
+    global voice_listener, main_event_loop
+    main_event_loop = asyncio.get_running_loop()
+    
+    print("Initializing Voice Listener...")
+    try:
+        voice_listener = VoiceListenerService(wake_word="karan")
+        if voice_listener.initialize():
+            voice_listener.on_wake_word(on_wake_word_detected)
+            voice_listener.start()
+        else:
+            print("Voice Listener failed to initialize.")
+    except Exception as e:
+         print(f"Error starting Voice Listener: {e}")
+
 # Initialize services
 try:
     print("Initializing AgentService...")
@@ -63,6 +111,22 @@ try:
 except Exception as e:
     print(f"Failed to initialize Settings Service: {e}")
     settings_service = None
+
+@app.websocket("/ws/voice_status")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    active_websockets.append(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        if websocket in active_websockets:
+            active_websockets.remove(websocket)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        if websocket in active_websockets:
+            active_websockets.remove(websocket)
 
 @app.get("/")
 async def root():

@@ -65,3 +65,5 @@ backend/static/audio/
 # Environment Info
 env_info.txt
 backend/env_info.txt
+backend/model
+

@@ -12,6 +12,9 @@ interface UseVoiceInputReturn {
     isWakeWordEnabled: boolean;
     toggleWakeWord: () => void;
     isWakeWordListening: boolean;
+    isBackendConnected: boolean;
+    finalTranscript: string | null;
+    resetFinalTranscript: () => void;
 }
 
 export const useVoiceInput = (): UseVoiceInputReturn => {
@@ -21,6 +24,57 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     const [wakeWordRecognition, setWakeWordRecognition] = useState<any>(null);
     const [isWakeWordEnabled, setIsWakeWordEnabled] = useState(false);
     const [isWakeWordListening, setIsWakeWordListening] = useState(false);
+    const [isBackendConnected, setIsBackendConnected] = useState(false);
+    const [finalTranscript, setFinalTranscript] = useState<string | null>(null);
+
+    // Force load voices on mount (Chrome requirement)
+    useEffect(() => {
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            window.speechSynthesis.getVoices();
+        }
+    }, []);
+
+    // Helper for Local TTS
+    const speak = useCallback((text: string, onEnd?: () => void) => {
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            // Attempt to select a clear English voice
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v =>
+                (v.name.includes("Google") || v.name.includes("Microsoft")) && v.lang.includes("en")
+            ) || voices.find(v => v.lang.includes("en")) || voices[0];
+
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+                console.log("Using Voice:", preferredVoice.name);
+            }
+
+            utterance.volume = 1;
+            utterance.rate = 1; /* Normal speed */
+            utterance.pitch = 1;
+
+            utterance.onstart = () => console.log("TTS Current Status: Started");
+
+            utterance.onend = () => {
+                console.log("TTS Current Status: Ended");
+                if (onEnd) setTimeout(onEnd, 100);
+            };
+
+            utterance.onerror = (e) => {
+                console.error("TTS Current Status: Error", e);
+                // Even on error, we should probably continue to listening so the user isn't stuck
+                if (onEnd) onEnd();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.warn("TTS not supported");
+            onEnd?.();
+        }
+    }, []);
 
     // Refs to avoid stale closures in event handlers
     const isListeningRef = useRef(false);
@@ -62,9 +116,15 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
 
             recognitionInstance.onresult = (event: any) => {
                 const current = event.resultIndex;
-                const transcriptText = event.results[current][0].transcript;
+                const result = event.results[current];
+                const transcriptText = result[0].transcript;
                 console.log("Main Recognition Result:", transcriptText);
                 setTranscript(transcriptText);
+
+                if (result.isFinal) {
+                    console.log("Final Transcript Detected:", transcriptText);
+                    setFinalTranscript(transcriptText);
+                }
             };
 
             recognitionInstance.onerror = (event: any) => {
@@ -81,98 +141,16 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
         }
     }, []); // Only run once on mount
 
-    // Wake Word Recognition Setup
-    useEffect(() => {
-        if (typeof window !== "undefined" && "webkitSpeechRecognition" in window) {
-            // @ts-ignore
-            const wakeInstance = new window.webkitSpeechRecognition();
-            wakeInstance.continuous = true;
-            wakeInstance.interimResults = true;
-            wakeInstance.lang = "en-US";
-
-            wakeInstance.onstart = () => setIsWakeWordListening(true);
-
-            wakeInstance.onend = () => {
-                setIsWakeWordListening(false);
-
-                // If we are deliberately switching to main, DO NOT restart wake word
-                if (isSwitchingToMainRef.current) {
-                    console.log("Wake word stopped for transition. Skipping auto-restart.");
-                    return;
-                }
-
-                // Auto-restart logic for accidental stops
-                if (isWakeWordEnabledRef.current && !isListeningRef.current) {
-                    console.log("Wake word listener stopped. Restarting...");
-                    try {
-                        wakeInstance.start();
-                    } catch (e) {
-                        // Ignore
-                    }
-                }
-            };
-
-            wakeInstance.onresult = (event: any) => {
-                const results = event.results;
-                const lastResult = results[results.length - 1];
-                const text = lastResult[0].transcript.toLowerCase().trim();
-                // Wake Word Detection Logic
-                // Expanded regex to handle misinterpretations (e.g. "hai ke" -> "hey k", "ke" -> "k")
-                const wakeWordRegex = /(^|\s)(hey\s?k|hai\s?k|hay\s?k|hey\s?ke|hai\s?ke|k|kay|ke|key|cay|que|computer)(\s|$|[.,!?])/i;
-                if (wakeWordRegex.test(text)) {
-                    console.log(`Wake Word Detected on: "${text}"`);
-
-                    // Set flag BEFORE aborting
-                    isSwitchingToMainRef.current = true;
-
-                    wakeInstance.abort(); // Force stop immediately
-                    setIsWakeWordListening(false);
-
-                    // Small delay to ensure mic is released before starting main recognition
-                    setTimeout(() => {
-                        startListeningRef.current?.();
-                    }, 250);
-                }
-            };
-
-            wakeInstance.onerror = (event: any) => {
-                // Ignore "no-speech" as it happens frequently in continuous mode
-                if (event.error !== "no-speech") {
-                    console.error("Wake Word Recognition Error:", event.error);
-                }
-            };
-
-            setWakeWordRecognition(wakeInstance);
-
-            return () => {
-                wakeInstance.abort();
-            };
-        }
-    }, []);
-
-    // Ref to hold the current startListening function to call it from the wake word closure
-    const startListeningRef = useRef<() => void>(() => { });
-
     const startListening = useCallback(() => {
-        // Stop wake word first and mark as switching (just in case called manually)
-        if (wakeWordRecognition) {
-            isSwitchingToMainRef.current = true;
-            try { wakeWordRecognition.abort(); } catch (e) { }
-        }
-
         if (recognition) {
             try {
+                setFinalTranscript(null);
                 recognition.start();
             } catch (e) {
                 console.error("Error starting recognition:", e);
             }
         }
-    }, [recognition, wakeWordRecognition]);
-
-    // Update the ref whenever startListening changes
-    useEffect(() => {
-        startListeningRef.current = startListening;
-    }, [startListening]);
+    }, [recognition]);
 
     const stopListening = useCallback(() => {
         if (recognition) {
@@ -180,60 +158,95 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
         }
     }, [recognition]);
 
-    const startWakeWordListener = useCallback(() => {
-        if (wakeWordRecognition && !isListeningRef.current) {
-            try {
-                wakeWordRecognition.start();
-            } catch (e) {
-                console.log("Wake word already started or error:", e);
-            }
-        }
-    }, [wakeWordRecognition]);
+    // WebSocket for Backend Wake Word (VOSK)
+    useEffect(() => {
+        let ws: WebSocket | null = null;
+        let reconnectTimer: NodeJS.Timeout;
 
-    const stopWakeWordListener = useCallback(() => {
-        if (wakeWordRecognition) {
-            try {
-                wakeWordRecognition.stop();
-            } catch (e) { }
+        const connect = () => {
+            if (typeof window === "undefined") return;
+
+            ws = new WebSocket("ws://localhost:8000/ws/voice_status");
+
+            ws.onopen = () => {
+                console.log("Connected to Voice Backend");
+                setIsBackendConnected(true);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "WAKE_WORD_DETECTED") {
+                        console.log("Backend Wake Word Detected:", data.text);
+                        // Only auto-start if enabled and not already listening
+                        if (isWakeWordEnabledRef.current && !isListeningRef.current && !isSwitchingToMainRef.current) {
+                            // Turn on "switching" flag early to prevent duplicate triggers
+                            isSwitchingToMainRef.current = true;
+                            speak("Yes Boss", () => {
+                                startListening();
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error("WS Parse Error", e);
+                }
+            };
+
+            ws.onerror = (e) => {
+                console.error("Voice WS Error", e);
+                setIsBackendConnected(false);
+            };
+
+            ws.onclose = () => {
+                console.log("Voice WS Closed. Reconnecting...");
+                setIsBackendConnected(false);
+                reconnectTimer = setTimeout(connect, 3000);
+            };
+        };
+
+        if (isWakeWordEnabled) {
+            connect();
         }
-    }, [wakeWordRecognition]);
+
+        return () => {
+            if (ws) ws.close();
+            clearTimeout(reconnectTimer);
+        };
+    }, [isWakeWordEnabled, startListening, speak]);
+
+    // Cleanup: No longer need startWakeWordListener / stopWakeWordListener as backend handles it
+    // But keeping empty functions to avoid breaking return signature if needed
+
+    const startWakeWordListener = useCallback(() => { }, []);
+    const stopWakeWordListener = useCallback(() => { }, []);
 
     const toggleWakeWord = useCallback(() => {
-        if (isWakeWordEnabled) {
-            setIsWakeWordEnabled(false);
-            // The effect watching [isWakeWordEnabled] will handle stopping
-        } else {
-            setIsWakeWordEnabled(true);
-            // The effect watching [isWakeWordEnabled] will handle starting
-        }
-    }, [isWakeWordEnabled]);
+        setIsWakeWordEnabled(prev => !prev);
+    }, []);
 
     // Watcher to start/stop wake word based on enabled state
-    useEffect(() => {
-        // Use refs to avoid dependency loops if needed, but state is fine here
-        if (isWakeWordEnabled && !isListening) {
-            const timer = setTimeout(() => {
-                startWakeWordListener();
-            }, 100);
-            return () => clearTimeout(timer);
-        } else if (!isWakeWordEnabled) {
-            stopWakeWordListener();
-        }
-    }, [isWakeWordEnabled, isListening, startWakeWordListener, stopWakeWordListener]);
+    // (Now just handled by WebSocket connection effect)
 
     const resetTranscript = useCallback(() => {
         setTranscript("");
     }, []);
 
+    const resetFinalTranscript = useCallback(() => {
+        setFinalTranscript(null);
+    }, []);
+
     return {
         isListening,
         transcript,
+        finalTranscript,
+        resetFinalTranscript,
         startListening,
         stopListening,
         resetTranscript,
         hasRecognition: !!recognition,
         isWakeWordEnabled,
         toggleWakeWord,
-        isWakeWordListening
+        isWakeWordListening,
+        isBackendConnected
     };
 };
