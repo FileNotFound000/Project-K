@@ -82,7 +82,7 @@ async def startup_event():
         voice_listener = VoiceListenerService(wake_word="karan")
         if voice_listener.initialize():
             voice_listener.on_wake_word(on_wake_word_detected)
-            voice_listener.start()
+            # voice_listener.start() # Wait for frontend to request start
         else:
             print("Voice Listener failed to initialize.")
     except Exception as e:
@@ -111,6 +111,24 @@ try:
 except Exception as e:
     print(f"Failed to initialize Settings Service: {e}")
     settings_service = None
+
+@app.post("/voice/start")
+async def start_voice_listener():
+    global voice_listener
+    if voice_listener:
+        if not voice_listener.is_running:
+             voice_listener.start()
+        return {"status": "started", "message": "Voice listener started"}
+    raise HTTPException(status_code=500, detail="Voice Listener not initialized")
+
+@app.post("/voice/stop")
+async def stop_voice_listener():
+    global voice_listener
+    if voice_listener:
+        if voice_listener.is_running:
+            voice_listener.stop()
+        return {"status": "stopped", "message": "Voice listener stopped"}
+    raise HTTPException(status_code=500, detail="Voice Listener not initialized")
 
 @app.websocket("/ws/voice_status")
 async def websocket_endpoint(websocket: WebSocket):

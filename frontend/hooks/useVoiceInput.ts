@@ -220,9 +220,17 @@ export const useVoiceInput = (): UseVoiceInputReturn => {
     const startWakeWordListener = useCallback(() => { }, []);
     const stopWakeWordListener = useCallback(() => { }, []);
 
-    const toggleWakeWord = useCallback(() => {
-        setIsWakeWordEnabled(prev => !prev);
-    }, []);
+    const toggleWakeWord = useCallback(async () => {
+        const newState = !isWakeWordEnabled;
+        setIsWakeWordEnabled(newState);
+
+        try {
+            // Sync with backend listener
+            await fetch(`http://localhost:8000/voice/${newState ? 'start' : 'stop'}`, { method: "POST" });
+        } catch (e) {
+            console.error("Failed to toggle backend voice listener", e);
+        }
+    }, [isWakeWordEnabled]);
 
     // Watcher to start/stop wake word based on enabled state
     // (Now just handled by WebSocket connection effect)

@@ -17,7 +17,9 @@ TOOLS:
 - execute_python: Execute Python code.
   Format: {"tool": "execute_python", "args": {"code": "print('hello')"}}
 - google_search: Search the web.
+  Format: {"tool": "google_search", "args": {"query": "weather in Tokyo"}}
 - read_url: Read content from a URL.
+  Format: {"tool": "read_url", "args": {"url": "https://example.com"}}
 - system_control: Control the system.
   Format: {"tool": "system_control", "args": {"action": "open_app", "app_name": "calculator"}}
   Format: {"tool": "system_control", "args": {"action": "open_app", "app_name": "code ."}} (Open VS Code in current folder)
@@ -530,6 +532,57 @@ class AgentService:
                                         output_str = f"Error: Unknown system control action '{action}'"
                                 else:
                                     output_str = "Error: System Control Service not available."
+
+                            elif tool_name == "google_search":
+                                query = tool_args.get("query")
+                                yield {"text": f"\n\n*Searching Google for '{query}'...*\n\n"}
+                                accumulated_response += f"\n\n*Searching Google for '{query}'...*\n\n"
+                                
+                                try:
+                                    from app.services.search import search_web
+                                    results = search_web(query)
+                                    output_str = f"Search Results:\n{results}"
+                                except Exception as e:
+                                    output_str = f"Error performing search: {e}"
+
+                            elif tool_name == "read_url":
+                                url = tool_args.get("url")
+                                yield {"text": f"\n\n*Reading URL {url}...*\n\n"}
+                                accumulated_response += f"\n\n*Reading URL {url}...*\n\n"
+                                
+                                try:
+                                    # Fallback: simple requests or browser read
+                                    # For now, let's use a simple scrape or system_control read if available
+                                    # But since search_web is simple, let's assume we might need a scraper service
+                                    # Let's check imports in main.py, it uses app.services.search.search_web
+                                    # Does main.py have a read_url? No.
+                                    # Let's try requests
+                                    import requests
+                                    from bs4 import BeautifulSoup
+                                    
+                                    try:
+                                        resp = requests.get(url, timeout=10)
+                                        soup = BeautifulSoup(resp.content, 'html.parser')
+                                        
+                                        # Remove script and style elements
+                                        for script in soup(["script", "style"]):
+                                            script.extract()
+                                            
+                                        text = soup.get_text()
+                                        
+                                        # Break into lines and remove leading and trailing space on each
+                                        lines = (line.strip() for line in text.splitlines())
+                                        # Break multi-headlines into a line each
+                                        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                                        # Drop blank lines
+                                        text = '\n'.join(chunk for chunk in chunks if chunk)
+                                        
+                                        output_str = f"URL Content ({url}):\n{text[:2000]}..." # Truncate
+                                    except Exception as e:
+                                        output_str = f"Error reading URL: {e}"
+                                        
+                                except ImportError:
+                                    output_str = "Error: requests or beautifulsoup4 not installed."
 
                             elif tool_name == "click_on_ui":
                                 description = tool_args.get("description")

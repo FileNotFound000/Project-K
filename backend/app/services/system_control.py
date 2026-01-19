@@ -74,8 +74,30 @@ class SystemControlService:
             else:
                 return "App launching only supported on Windows for now."
         except Exception as e:
-            # Try using pyautogui to press win key and type
+            # Fallback for common web apps or specific failures
             try:
+                if "youtube" in app_name.lower():
+                    import webbrowser
+                    # If the app_name looks like a URL or a complicated query, try to respect it
+                    if "http" in app_name or ".com" in app_name:
+                         # It's likely a URL passed as app_name
+                         url = app_name
+                         if not url.startswith("http"):
+                             url = "https://" + url.strip()
+                         # Clean up "chrome " prefix if agent added it
+                         url = url.replace("https://chrome ", "https://") 
+                         webbrowser.open(url)
+                         return f"Opened YouTube URL: {url}"
+                    else:
+                        webbrowser.open("https://www.youtube.com")
+                        return "Opened YouTube in browser."
+                elif "spotify" in app_name.lower() and "http" not in app_name: 
+                    # Try spotify protocol or web
+                    import webbrowser
+                    webbrowser.open("https://open.spotify.com")
+                    return "Opened Spotify in browser."
+                
+                # Try using pyautogui to press win key and type
                 pyautogui.press('win')
                 pyautogui.sleep(0.5)
                 pyautogui.write(app_name)

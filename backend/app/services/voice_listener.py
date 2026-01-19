@@ -88,4 +88,14 @@ class VoiceListenerService:
                             
         except Exception as e:
             print(f"Voice Listener Error: {e}")
+        finally:
+            try:
+                if 'stream' in locals():
+                    stream.stop_stream()
+                    stream.close()
+                if 'p' in locals():
+                    p.terminate()
+                print("Voice Listener Thread Stopped/Cleaned up.")
+            except Exception as e:
+                print(f"Error closing voice listener resources: {e}")
             
