@@ -20,7 +20,7 @@ class WorkflowService:
                 {"action": "open_application", "app_name": "steam"}
             ],
             "focus_mode": [
-                 {"action": "set_volume", "level": 40},
+                 {"action": "set_volume", "level": 50},
                  {"action": "open_application", "app_name": "https://www.youtube.com/watch?v=CBSlu_VMS9U"} # Lofi Girl
             ],
              "sleep_mode": [
