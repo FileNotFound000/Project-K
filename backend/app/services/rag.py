@@ -48,7 +48,7 @@ def ingest_document(file_path: str, filename: str):
         doc = Document(file_path)
         for para in doc.paragraphs:
             text += para.text + "\n"
-    elif filename.endswith(".txt") or filename.endswith(".md"):
+    elif filename.endswith((".txt", ".md", ".py", ".js", ".ts", ".tsx", ".json", ".css", ".html")):
         with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
     else:
@@ -96,3 +96,15 @@ def clear_knowledge_base():
     except Exception as e:
         print(f"Error clearing knowledge base: {e}")
         return False
+        return False
+
+def remove_document(filename: str) -> str:
+    """Removes all chunks associated with a specific filename."""
+    try:
+        # Delete using metadata filter
+        collection.delete(
+            where={"source": filename}
+        )
+        return f"Successfully removed all memories related to {filename}."
+    except Exception as e:
+        return f"Error removing document: {e}"
