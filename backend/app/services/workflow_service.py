@@ -12,8 +12,7 @@ class WorkflowService:
                 {"action": "set_volume", "level": 30},
                 {"action": "open_application", "app_name": "code ."}, # VS Code in current dir
                 {"action": "open_application", "app_name": "http://localhost:3000"}, # Frontend
-                {"action": "open_application", "app_name": "http://localhost:8000/docs"}, # Backend Docs
-                {"action": "open_application", "app_name": "https://open.spotify.com/playlist/37i9dQZF1DX6tGWj8KW8Ww"} # Focus Music
+                {"action": "open_application", "app_name": "http://localhost:8000/docs"} # Focus Music
             ],
             "gaming_mode": [
                 {"action": "set_volume", "level": 100},
