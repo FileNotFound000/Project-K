@@ -45,6 +45,12 @@ TOOLS:
 - execute_workflow: Execute a system macro/preset.
   Format: {"tool": "execute_workflow", "args": {"name": "work_mode"}}
   Available Workflows: work_mode, gaming_mode, focus_mode, sleep_mode
+- ingest_file: Read and memorize a file (PDF, TXT, DOCX, Code).
+  Format: {"tool": "ingest_file", "args": {"path": "C:/Users/Docs/plan.pdf"}}
+- forget_file: Remove a file from memory/knowledge base.
+  Format: {"tool": "forget_file", "args": {"filename": "plan.pdf"}}
+- search_knowledge: Search your local knowledge base/second brain.
+  Format: {"tool": "search_knowledge", "args": {"query": "summary of the plan"}}
 
 CRITICAL RULES:
 1. To use a tool, you MUST output the JSON command.
@@ -577,6 +583,51 @@ class AgentService:
                                         output_str = f"Error executing workflow: {e}"
                                 else:
                                     output_str = "Error: Workflow Service not available (System Control might be down)."
+
+                            elif tool_name == "ingest_file":
+                                path = tool_args.get("path")
+                                yield {"text": f"\n\n*Ingesting file {path}...*\n\n"}
+                                accumulated_response += f"\n\n*Ingesting file {path}...*\n\n"
+                                
+                                try:
+                                    from app.services.rag import ingest_document
+                                    import os
+                                    if os.path.exists(path):
+                                        filename = os.path.basename(path)
+                                        output_str = ingest_document(path, filename)
+                                    else:
+                                        output_str = f"Error: File not found at {path}"
+                                except Exception as e:
+                                    output_str = f"Error ingesting file: {e}"
+
+                            elif tool_name == "forget_file":
+                                filename = tool_args.get("filename")
+                                # Use basename if full path provided
+                                import os
+                                filename = os.path.basename(filename)
+                                yield {"text": f"\n\n*Removing {filename} from memory...*\n\n"}
+                                accumulated_response += f"\n\n*Removing {filename} from memory...*\n\n"
+                                
+                                try:
+                                    from app.services.rag import remove_document
+                                    output_str = remove_document(filename)
+                                except Exception as e:
+                                    output_str = f"Error removing file: {e}"
+
+                            elif tool_name == "search_knowledge":
+                                query = tool_args.get("query")
+                                yield {"text": f"\n\n*Searching Brain for '{query}'...*\n\n"}
+                                accumulated_response += f"\n\n*Searching Brain for '{query}'...*\n\n"
+                                
+                                try:
+                                    from app.services.rag import retrieve_context
+                                    results = retrieve_context(query)
+                                    if results:
+                                        output_str = f"Knowledge Base Results:\n{results}"
+                                    else:
+                                        output_str = "No relevant information found in knowledge base."
+                                except Exception as e:
+                                    output_str = f"Error searching knowledge base: {e}"
 
                             elif tool_name == "search_youtube":
                                 query = tool_args.get("query")
