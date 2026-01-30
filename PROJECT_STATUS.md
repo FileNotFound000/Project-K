@@ -25,9 +25,9 @@ The application is fully functional with a robust set of features. The core chat
 - [x] **Smart Media**: Direct YouTube playback and App control.
 
 ## Next Steps (Future Ideas)
-- [ ] **Desktop Janitor**: Autonomous file cleanup agent.
-- [ ] **Dashboard UI**: Visual widgets for system state.
-- [ ] **Always-On Voice**: Service mode optimization.
+- [ ] **The Architect**: Recursive project generator (Build entire apps from one prompt).
+- [ ] **The Bridge**: Mobile access via Telegram/Discord (Control PC remotely).
+- [ ] **Deep Context**: Temporal memory (Remember activity/state over time).
 
 ## Known Issues
 Research is full of codec errors and no meaningful reports.
