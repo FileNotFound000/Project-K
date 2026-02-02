@@ -28,6 +28,11 @@ The application is fully functional with a robust set of features. The core chat
 - [ ] **The Architect**: Recursive project generator (Build entire apps from one prompt).
 - [ ] **The Bridge**: Mobile access via Telegram/Discord (Control PC remotely).
 - [ ] **Deep Context**: Temporal memory (Remember activity/state over time).
+- [ ] **Metamorphosis**: Self-Evolution (Agent fixes its own bugs).
+- [ ] **The Analyst**: Visual Dashboard (Heatmaps of productivity/system).
+- [ ] **The Swarm**: Multi-Agent Collaboration (Specialized sub-agents).
+- [ ] **The Predictor**: Proactive Actions (Zero-click app launching based on routine).
+- [ ] **Local Grid**: P2P Knowledge Share (Sync Second Brain across devices).
 
 ## Known Issues
 Research is full of codec errors and no meaningful reports.
