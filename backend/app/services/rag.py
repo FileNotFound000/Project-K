@@ -1,7 +1,7 @@
 import os
 import chromadb
 from chromadb.utils import embedding_functions
-import google.generativeai as genai
+from google import genai
 from pypdf import PdfReader
 from docx import Document
 from dotenv import load_dotenv
@@ -14,20 +14,31 @@ chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 # Use Gemini for embeddings (requires GEMINI_API_KEY)
 google_api_key = os.getenv("GEMINI_API_KEY")
+gemini_client = None
 if not google_api_key:
     print("Warning: GEMINI_API_KEY not found. RAG will not work.")
 else:
-    genai.configure(api_key=google_api_key)
+    gemini_client = genai.Client(api_key=google_api_key)
 
 # Custom embedding function using Gemini
 class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
     def __call__(self, input: list[str]) -> list[list[float]]:
-        # Gemini embedding model: models/embedding-001 or models/text-embedding-004
-        model = "models/text-embedding-004" 
-        return [
-            genai.embed_content(model=model, content=text, task_type="retrieval_document")["embedding"]
-            for text in input
-        ]
+        if not gemini_client:
+            print("Warning: gemini_client is None.")
+            return [[0.0] * 768 for _ in input]
+            
+        try:
+            # We use the recommended standard embedding model
+            result = gemini_client.models.embed_content(
+                model="text-embedding-004", 
+                contents=input
+            )
+            # result.embeddings is a list of EmbedContentResponse objects
+            # each object has a 'values' attribute which is the float array
+            return [e.values for e in result.embeddings]
+        except Exception as e:
+            print(f"Error during embedding generation: {e}")
+            return [[0.0] * 768 for _ in input]
 
 # Create or get collection
 # We use a custom embedding function to ensure compatibility with Gemini
@@ -95,7 +106,6 @@ def clear_knowledge_base():
         return True
     except Exception as e:
         print(f"Error clearing knowledge base: {e}")
-        return False
         return False
 
 def remove_document(filename: str) -> str:

@@ -4,12 +4,14 @@ import io
 import json
 import os
 from PIL import Image, ImageDraw
-import google.generativeai as genai
+from google import genai
 from app.services.settings import SettingsService
 
 class VisionService:
     def __init__(self):
         self.settings_service = SettingsService()
+        self.client = None
+        self.model_name = 'gemini-2.5-flash'
         self._configure_genai()
 
     def _configure_genai(self):
@@ -26,12 +28,9 @@ class VisionService:
             api_key = os.getenv("GEMINI_API_KEY")
 
         if api_key:
-            genai.configure(api_key=api_key)
-            # Use Flash for speed and vision capabilities
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            self.client = genai.Client(api_key=api_key)
         else:
             print("Gemini API key not configured in settings or environment.")
-            self.model = None
 
     def capture_screen(self):
         """
@@ -48,9 +47,9 @@ class VisionService:
         Analyzes the screen and finds the coordinates of the element matching the description.
         Returns (x, y) or None.
         """
-        if not self.model:
+        if not self.client:
             self._configure_genai()
-            if not self.model:
+            if not self.client:
                 print("Gemini API key not configured.")
                 return None
 
@@ -60,9 +59,6 @@ class VisionService:
             
         screen_width, screen_height = screenshot.size
 
-        # Create a clearer prompt for coordinate extraction
-        # We don't necessarily need a grid if the model is good at spatial reasoning,
-        # but asking for relative 0-1000 coordinates is often reliable for Gemini 1.5 Pro/Flash.
         prompt = f"""
         I am looking at a screenshot of a computer desktop. verify the resolution is {screen_width}x{screen_height}.
         Find the UI element described as: "{description}".
@@ -76,7 +72,10 @@ class VisionService:
 
         try:
             # Pass the image directly
-            response = self.model.generate_content([prompt, screenshot])
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt, screenshot]
+            )
             text = response.text
             
             # Extract JSON
