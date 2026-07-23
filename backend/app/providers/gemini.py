@@ -53,7 +53,7 @@ class GeminiProvider(LLMProvider):
         gemini_history.append(types.Content(role="user", parts=parts))
 
         def log_debug(msg):
-            with open("debug_gemini.log", "a") as f:
+            with open("debug_gemini.log", "a", encoding="utf-8") as f:
                 f.write(f"{msg}\n")
 
         try:
@@ -84,7 +84,7 @@ class GeminiProvider(LLMProvider):
         try:
             # google-genai specific synchronous embedding call
             result = self.client.models.embed_content(
-                model="text-embedding-004",
+                model="gemini-embedding-2",
                 contents=text,
             )
             # embeddings is a list of EmbedContentResponse, we need .embeddings[0].values

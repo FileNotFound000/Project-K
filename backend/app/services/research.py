@@ -5,10 +5,14 @@ from app.services.agent import AgentService
 import asyncio
 import json
 import re
+import sys
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 async def search_and_scrape(query: str, max_results: int = 3) -> str:
     """Searches the web and scrapes content from top results."""
-    print(f"Searching for: {query}")
+    logger.info(f"Searching for: {query}")
     results = []
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -29,14 +33,17 @@ async def search_and_scrape(query: str, max_results: int = 3) -> str:
                     results.append(f"Source: {title} ({url})\nSnippet: {snippet}\n(Skipped scraping PDF/Restricted)\n---")
                     continue
                     
-                print(f"Scraping: {url}")
+                logger.info(f"Scraping: {url}")
                 
                 content_to_add = ""
                 try:
                     # Timeout to prevent hanging
                     response = requests.get(url, headers=headers, timeout=5)
+                    # Use apparent_encoding if encoding is missing or ISO-8859-1 (often wrong default)
+                    if not response.encoding or response.encoding.lower() == 'iso-8859-1':
+                        response.encoding = response.apparent_encoding
                     if response.status_code == 200:
-                        soup = BeautifulSoup(response.content, 'html.parser')
+                        soup = BeautifulSoup(response.text, 'html.parser')
                         
                         # Remove script and style elements
                         for script in soup(["script", "style", "nav", "footer", "header"]):
@@ -56,7 +63,7 @@ async def search_and_scrape(query: str, max_results: int = 3) -> str:
                         content_to_add = snippet
                         
                 except Exception as e:
-                    print(f"Failed to scrape {url}: {e}")
+                    logger.error(f"Failed to scrape {url}: {e}")
                     content_to_add = snippet
                 
                 results.append(f"Source: {title} ({url})\nContent:\n{content_to_add}\n---")

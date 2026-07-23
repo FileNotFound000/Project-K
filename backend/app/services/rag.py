@@ -30,7 +30,7 @@ class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
         try:
             # We use the recommended standard embedding model
             result = gemini_client.models.embed_content(
-                model="text-embedding-004", 
+                model="gemini-embedding-2", 
                 contents=input
             )
             # result.embeddings is a list of EmbedContentResponse objects

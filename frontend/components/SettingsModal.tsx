@@ -429,12 +429,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                                 </div>
                                                 <div>
                                                     <label className="mb-2 block text-sm font-medium text-neutral-300">Model</label>
-                                                    <input
-                                                        type="text"
+                                                    <select
                                                         value={settings.providers?.gemini?.model || 'gemini-2.5-flash-lite'}
                                                         onChange={(e) => updateProviderSetting('gemini', 'model', e.target.value)}
-                                                        className="w-full rounded-lg border border-white/10 bg-neutral-900 p-2.5 text-white placeholder-neutral-600 focus:border-purple-500 focus:outline-none"
-                                                    />
+                                                        className="w-full rounded-lg border border-white/10 bg-neutral-900 p-2.5 text-white focus:border-purple-500 focus:outline-none"
+                                                    >
+                                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                                        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                                    </select>
                                                 </div>
                                             </div>
                                         )}

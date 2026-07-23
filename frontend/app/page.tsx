@@ -2,15 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { Mic, Send, StopCircle, Paperclip, X, Image as ImageIcon, Menu, Volume2, Loader2, FileText, Globe, Plus } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Menu } from "lucide-react";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import Sidebar from "@/components/Sidebar";
-import KOrb from '@/components/KOrb';
-import SettingsModal from "@/components/SettingsModal";
+import MessageList from "@/components/MessageList";
+import ChatInput from "@/components/ChatInput";
 
-interface Message {
+export interface Message {
   role: "user" | "assistant";
   content: string;
 }
@@ -19,28 +17,6 @@ interface Session {
   id: string;
   title: string;
   created_at: string;
-}
-
-function stripJSON(text: string) {
-  let result = "";
-  let i = 0;
-  while (i < text.length) {
-    // Check for start of JSON block
-    if (text.substring(i).startsWith('{"tool":') || text.substring(i).startsWith('{"result":')) {
-      let depth = 0;
-      // Consume until balanced
-      while (i < text.length) {
-        if (text[i] === '{') depth++;
-        if (text[i] === '}') depth--;
-        i++;
-        if (depth === 0) break;
-      }
-    } else {
-      result += text[i];
-      i++;
-    }
-  }
-  return result.trim();
 }
 
 export default function Home() {
@@ -471,167 +447,38 @@ export default function Home() {
           </div>
         </div>
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-violet-600/20 scrollbar-track-transparent">
-          <div className="max-w-4xl mx-auto flex flex-col gap-4 pb-4">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-[50vh] text-violet-300/30">
-                <p className="font-light tracking-widest text-lg">AWAITING INPUT</p>
-                <p className="text-xs mt-2 font-mono">Select a chat or start a new one</p>
-              </div>
-            )}
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-4 rounded-2xl backdrop-blur-md shadow-sm max-w-[90%] md:max-w-[80%] group relative ${msg.role === "user"
-                  ? "bg-violet-600/10 dark:bg-violet-600/10 ml-auto border border-violet-500/20 text-violet-900 light:text-violet-900 dark:text-violet-100 rounded-tr-none"
-                  : "bg-blue-900/10 dark:bg-blue-900/10 mr-auto border border-blue-500/20 text-blue-900 light:text-blue-900 dark:text-blue-100 rounded-tl-none"
-                  }`}
-              >
-                <div className="text-sm md:text-base leading-relaxed prose dark:prose-invert prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-ul:text-inherit prose-ol:text-inherit prose-li:text-inherit prose-pre:bg-transparent max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {stripJSON(msg.content)}
-                  </ReactMarkdown>
-                </div>
-
-                {msg.role === "assistant" && msg.content && (
-                  <button
-                    onClick={() => playMessageAudio(msg.content, idx)}
-                    className={`absolute -bottom-6 left-0 p-1 transition-colors ${(isPlaying && playingMessageIndex === idx) || loadingMessageIndex === idx
-                      ? "text-violet-300"
-                      : "text-violet-400/50 hover:text-violet-300"
-                      }`}
-                    title={isPlaying && playingMessageIndex === idx ? "Stop reading" : "Read aloud"}
-                    disabled={loadingMessageIndex === idx}
-                  >
-                    {loadingMessageIndex === idx ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : isPlaying && playingMessageIndex === idx ? (
-                      <StopCircle size={16} className="text-red-400 hover:text-red-300" />
-                    ) : (
-                      <Volume2 size={16} />
-                    )}
-                  </button>
-                )}
-              </div>
-            ))}
-            {isProcessing && (
-              <div className="flex items-center gap-2 text-violet-400 text-xs font-mono tracking-widest ml-2 animate-pulse">
-                <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                PROCESSING
-              </div>
-            )}
-            <div ref={(el) => { el?.scrollIntoView({ behavior: "smooth" }); }} />
-          </div>
-        </div>
+        <MessageList 
+          messages={messages}
+          isProcessing={isProcessing}
+          isPlaying={isPlaying}
+          playingMessageIndex={playingMessageIndex}
+          loadingMessageIndex={loadingMessageIndex}
+          onPlayAudio={playMessageAudio}
+          onStopAudio={stopAudio}
+        />
 
         {/* Input Area */}
-        <div className="flex-none w-full p-4 pb-6 z-20">
-          <div className="max-w-4xl mx-auto flex flex-col gap-2">
-            {/* Image Preview */}
-            {previewUrl && (
-              <div className="relative w-fit self-start ml-4 animate-in fade-in slide-in-from-bottom-2">
-                <img src={previewUrl} alt="Preview" className="h-24 w-auto rounded-xl border border-violet-500/30 shadow-lg bg-black/50" />
-                <button
-                  onClick={clearImage}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-
-            <div className="w-full flex items-center gap-2 md:gap-3 bg-white/5 p-2 pr-2 md:pr-3 rounded-[2rem] border border-white/10 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-              <button
-                onClick={isListening ? stopListening : startListening}
-                className={`p-3 md:p-4 rounded-full transition-all duration-300 ${isListening
-                  ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse"
-                  : "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                  }`}
-                disabled={!hasRecognition}
-                title="Voice Input"
-              >
-                {isListening ? <StopCircle size={20} /> : <Mic size={20} />}
-              </button>
-
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleImageSelect}
-              />
-
-              <input
-                type="file"
-                accept=".pdf,.txt,.md,.docx"
-                className="hidden"
-                ref={docInputRef}
-                onChange={handleFileUpload}
-              />
-
-              {/* Tools Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
-                  className={`p-2 md:p-3 rounded-full transition-all duration-300 ${isToolsMenuOpen
-                    ? "bg-violet-500/20 text-violet-300 rotate-45"
-                    : "bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300"
-                    }`}
-                  title="Tools"
-                >
-                  <Plus size={20} />
-                </button>
-
-                {isToolsMenuOpen && (
-                  <div className="absolute bottom-full left-0 mb-4 bg-black/90 backdrop-blur-2xl border border-white/10 rounded-2xl p-2 flex flex-col gap-1 min-w-[180px] shadow-2xl animate-in fade-in slide-in-from-bottom-2 z-50">
-                    <button
-                      onClick={() => { docInputRef.current?.click(); setIsToolsMenuOpen(false); }}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 text-sm text-violet-200 transition-colors text-left"
-                    >
-                      <FileText size={16} className="text-violet-400" />
-                      <span>Upload Document</span>
-                    </button>
-
-                    <button
-                      onClick={() => { fileInputRef.current?.click(); setIsToolsMenuOpen(false); }}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 text-sm text-violet-200 transition-colors text-left"
-                    >
-                      <Paperclip size={16} className="text-violet-400" />
-                      <span>Upload Image</span>
-                    </button>
-
-                    <button
-                      onClick={() => { setIsResearchMode(!isResearchMode); setIsToolsMenuOpen(false); }}
-                      className={`flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 text-sm transition-colors text-left ${isResearchMode ? "bg-blue-500/20 text-blue-200" : "text-violet-200"}`}
-                    >
-                      <Globe size={16} className={isResearchMode ? "text-blue-400" : "text-violet-400"} />
-                      <span>{isResearchMode ? "Disable Research" : "Research Mode"}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                placeholder={hasRecognition ? "Initialize command..." : isResearchMode ? "Enter research topic..." : "Type a message..."}
-                className="flex-1 bg-transparent border-none outline-none text-foreground placeholder-violet-400/30 font-mono text-sm px-2 h-full min-w-0"
-              />
-
-              <button
-                onClick={() => sendMessage()}
-                disabled={(!inputText.trim() && !selectedImage) || isProcessing}
-                className="p-3 md:p-3.5 rounded-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:opacity-90 disabled:opacity-50 disabled:hover:opacity-50 transition-all shadow-lg shadow-violet-500/20"
-              >
-                <Send size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <ChatInput 
+          inputText={inputText}
+          setInputText={setInputText}
+          sendMessage={sendMessage}
+          isProcessing={isProcessing}
+          selectedImage={selectedImage}
+          previewUrl={previewUrl}
+          clearImage={clearImage}
+          handleImageSelect={handleImageSelect}
+          handleFileUpload={handleFileUpload}
+          isListening={isListening}
+          startListening={startListening}
+          stopListening={stopListening}
+          hasRecognition={hasRecognition}
+          isResearchMode={isResearchMode}
+          setIsResearchMode={setIsResearchMode}
+          isToolsMenuOpen={isToolsMenuOpen}
+          setIsToolsMenuOpen={setIsToolsMenuOpen}
+          docInputRef={docInputRef}
+          fileInputRef={fileInputRef}
+        />
       </div>
       <audio ref={audioRef} className="hidden" />
     </main>
